@@ -208,7 +208,8 @@ class UserSearchFragment : Fragment() {
         if (childCount == 0) return null
         for (i in childCount - 1 downTo 0) {
             val child = binding.group.getChildAt(i) ?: continue
-            val tag = child.tag as RankedRecipient
+            val tempTag = child.tag ?: continue
+            val tag = tempTag as RankedRecipient
             if (isUser && tag.user == null || !isUser && tag.thread == null) continue
             if (isUser && tag.user?.pk == recipient.user?.pk || !isUser && tag.thread?.threadId == recipient.thread?.threadId) {
                 return child
