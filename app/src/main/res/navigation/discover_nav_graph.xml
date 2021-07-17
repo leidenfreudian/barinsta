@@ -11,9 +11,27 @@
         android:label="@string/title_discover"
         tools:layout="@layout/fragment_discover">
 
+        <argument
+            android:name="keyword"
+            android:defaultValue="@null"
+            app:argType="string"
+            app:nullable="true" />
+
         <action
-            android:id="@+id/action_to_topic_posts"
-            app:destination="@id/topicPostsFragment" />
+            android:id="@+id/action_to_comments"
+            app:destination="@id/commentsViewerFragment" />
+
+        <action
+            android:id="@+id/action_to_hashtag"
+            app:destination="@id/hashTagFragment" />
+
+        <action
+            android:id="@+id/action_to_location"
+            app:destination="@id/locationFragment" />
+
+        <action
+            android:id="@+id/action_to_profile"
+            app:destination="@id/profile_non_top" />
 
         <action
             android:id="@+id/action_to_post"
@@ -345,44 +363,6 @@
             android:id="@+id/action_to_profile"
             app:destination="@id/profile_non_top" />
     </dialog>
-
-    <fragment
-        android:id="@+id/topicPostsFragment"
-        android:name="awais.instagrabber.fragments.TopicPostsFragment"
-        tools:layout="@layout/fragment_topic_posts">
-
-        <argument
-            android:name="topicCluster"
-            app:argType="awais.instagrabber.repositories.responses.discover.TopicCluster" />
-
-        <argument
-            android:name="titleColor"
-            app:argType="integer" />
-
-        <argument
-            android:name="backgroundColor"
-            app:argType="integer" />
-
-        <action
-            android:id="@+id/action_to_comments"
-            app:destination="@id/commentsViewerFragment" />
-
-        <action
-            android:id="@+id/action_to_hashtag"
-            app:destination="@id/hashTagFragment" />
-
-        <action
-            android:id="@+id/action_to_location"
-            app:destination="@id/locationFragment" />
-
-        <action
-            android:id="@+id/action_to_profile"
-            app:destination="@id/profile_non_top" />
-
-        <action
-            android:id="@+id/action_to_post"
-            app:destination="@id/postViewFragment" />
-    </fragment>
 
     <!-- Copy of notification viewer fragment tag -->
     <!-- Required to get back arrow in action bar -->
