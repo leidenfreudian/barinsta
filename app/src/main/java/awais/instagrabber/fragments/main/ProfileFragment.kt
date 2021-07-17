@@ -477,7 +477,7 @@ class ProfileFragment : Fragment(), OnRefreshListener, ConfirmDialogFragmentCall
             setupFavChip(profile, currentUser)
             setupFavButton(currentUser, profile)
             setupSavedButton(currentUser, profile)
-            setupTaggedButton(currentUser, profile)
+            setupTaggedButton(profile)
             setupLikedButton(currentUser, profile)
             setupDMButton(currentUser, profile)
             if (profile == null) return@observe
@@ -755,8 +755,8 @@ class ProfileFragment : Fragment(), OnRefreshListener, ConfirmDialogFragmentCall
         }
     }
 
-    private fun setupTaggedButton(currentUser: User?, profile: User?) {
-        val visibility = if (currentUser != null && profile?.pk == currentUser.pk) View.VISIBLE else View.GONE
+    private fun setupTaggedButton(profile: User?) {
+        val visibility = if (profile?.usertagsCount == 0L) View.GONE else View.VISIBLE
         binding.header.btnTagged.visibility = visibility
         if (visibility == View.GONE) {
             binding.header.btnTagged.setOnClickListener(null)
