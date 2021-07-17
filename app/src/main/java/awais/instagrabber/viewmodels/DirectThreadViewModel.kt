@@ -169,21 +169,19 @@ class DirectThreadViewModel(
         val items = thread.items
         if (items.isNullOrEmpty()) return successEventResObjectLiveData
         val directItem = items.firstOrNull { (_, userId) -> userId != currentUser.pk } ?: return successEventResObjectLiveData
-        val lastSeenAt = thread.lastSeenAt
-        if (lastSeenAt != null) {
-            val seenAt = lastSeenAt[currentUser.pk] ?: return successEventResObjectLiveData
-            try {
-                val timestamp = seenAt.timestamp ?: return successEventResObjectLiveData
-                val itemIdMatches = seenAt.itemId == directItem.itemId
-                val timestampMatches = timestamp.toLong() >= directItem.getTimestamp()
-                if (itemIdMatches || timestampMatches) {
-                    return successEventResObjectLiveData
-                }
-            } catch (ignored: Exception) {
+        val lastSeenAt = thread.lastSeenAt ?: return threadManager.markAsSeen(directItem, viewModelScope)
+        val seenAt = lastSeenAt[currentUser.pk] ?: return threadManager.markAsSeen(directItem, viewModelScope)
+        try {
+            val timestamp = seenAt.timestamp ?: return threadManager.markAsSeen(directItem, viewModelScope)
+            val itemIdMatches = seenAt.itemId == directItem.itemId
+            val timestampMatches = timestamp.toLong() >= directItem.getTimestamp()
+            if (itemIdMatches || timestampMatches) {
                 return successEventResObjectLiveData
             }
+            return threadManager.markAsSeen(directItem, viewModelScope)
+        } catch (ignored: Exception) {
+            return successEventResObjectLiveData
         }
-        return threadManager.markAsSeen(directItem, viewModelScope)
     }
 
     private val successEventResObjectLiveData: MutableLiveData<Resource<Any?>>
