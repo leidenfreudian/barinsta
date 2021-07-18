@@ -385,6 +385,8 @@ class ProfileFragment : Fragment(), OnRefreshListener, ConfirmDialogFragmentCall
                 backStackSavedStateResultLiveData?.observe(viewLifecycleOwner, backStackSavedStateObserver)
             }
             mainActivity.supportActionBar?.title = viewModel.username.value
+            val (currentUserData, profileData) = viewModel.currentUserProfileActionLiveData.value!!
+            setupOptionsMenuItems(currentUserData.data, profileData.data)
         } catch (e: Exception) {
             Log.e(TAG, "onResume: ", e)
         }
@@ -654,10 +656,10 @@ class ProfileFragment : Fragment(), OnRefreshListener, ConfirmDialogFragmentCall
         restrictMenuItem?.setTitle(if (profile.friendshipStatus?.isRestricted == true) R.string.unrestrict else R.string.restrict)
 
         muteStoriesMenuItem?.isVisible = true
-        muteStoriesMenuItem?.setTitle(if (profile.friendshipStatus?.isMutingReel == true) R.string.mute_stories else R.string.unmute_stories)
+        muteStoriesMenuItem?.setTitle(if (profile.friendshipStatus?.isMutingReel == true) R.string.unmute_stories else R.string.mute_stories)
 
         mutePostsMenuItem?.isVisible = true
-        mutePostsMenuItem?.setTitle(if (profile.friendshipStatus?.muting == true) R.string.mute_posts else R.string.unmute_posts)
+        mutePostsMenuItem?.setTitle(if (profile.friendshipStatus?.muting == true) R.string.unmute_posts else R.string.mute_posts)
 
         chainingMenuItem?.isVisible = profile.hasChaining
         removeFollowerMenuItem?.isVisible = profile.friendshipStatus?.followedBy ?: false
