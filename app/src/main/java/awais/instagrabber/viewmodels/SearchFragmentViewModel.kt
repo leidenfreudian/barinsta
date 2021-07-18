@@ -1,365 +1,284 @@
-package awais.instagrabber.viewmodels;
+package awais.instagrabber.viewmodels
 
-import android.app.Application;
-import android.util.Log;
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Transformations
+import androidx.lifecycle.viewModelScope
+import awais.instagrabber.db.datasources.RecentSearchDataSource
+import awais.instagrabber.db.entities.Favorite
+import awais.instagrabber.db.entities.RecentSearch
+import awais.instagrabber.db.entities.RecentSearch.Companion.fromSearchItem
+import awais.instagrabber.db.repositories.FavoriteRepository
+import awais.instagrabber.db.repositories.RecentSearchRepository
+import awais.instagrabber.models.Resource
+import awais.instagrabber.models.Resource.Companion.error
+import awais.instagrabber.models.Resource.Companion.loading
+import awais.instagrabber.models.Resource.Companion.success
+import awais.instagrabber.models.enums.FavoriteType
+import awais.instagrabber.repositories.responses.search.SearchItem
+import awais.instagrabber.repositories.responses.search.SearchResponse
+import awais.instagrabber.utils.*
+import awais.instagrabber.utils.AppExecutors.mainThread
+import awais.instagrabber.utils.TextUtils.isEmpty
+import awais.instagrabber.webservices.SearchRepository
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.FutureCallback
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.SettableFuture
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import java.util.*
+import java.util.function.BiConsumer
+import java.util.stream.Collectors
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.lifecycle.LiveData;
-import androidx.lifecycle.MutableLiveData;
+class SearchFragmentViewModel(application: Application) : AppStateViewModel(application) {
+    private val query = MutableLiveData<String>()
+    private val topResults = MutableLiveData<Resource<List<SearchItem>?>>()
+    private val userResults = MutableLiveData<Resource<List<SearchItem>?>>()
+    private val hashtagResults = MutableLiveData<Resource<List<SearchItem>?>>()
+    private val locationResults = MutableLiveData<Resource<List<SearchItem>?>>()
+    private val searchRepository: SearchRepository by lazy { SearchRepository.getInstance() }
+    private val searchCallback: Debouncer.Callback<String> = object : Debouncer.Callback<String> {
+        override fun call(key: String) {
+            if (tempQuery == null) return
+            query.postValue(tempQuery)
+        }
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-import awais.instagrabber.db.datasources.RecentSearchDataSource;
-import awais.instagrabber.db.entities.Favorite;
-import awais.instagrabber.db.entities.RecentSearch;
-import awais.instagrabber.db.repositories.FavoriteRepository;
-import awais.instagrabber.db.repositories.RecentSearchRepository;
-import awais.instagrabber.models.Resource;
-import awais.instagrabber.models.enums.FavoriteType;
-import awais.instagrabber.repositories.responses.search.SearchItem;
-import awais.instagrabber.repositories.responses.search.SearchResponse;
-import awais.instagrabber.utils.AppExecutors;
-import awais.instagrabber.utils.Constants;
-import awais.instagrabber.utils.CookieUtils;
-import awais.instagrabber.utils.CoroutineUtilsKt;
-import awais.instagrabber.utils.Debouncer;
-import awais.instagrabber.utils.TextUtils;
-import awais.instagrabber.webservices.SearchService;
-import kotlinx.coroutines.Dispatchers;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-
-import static androidx.lifecycle.Transformations.distinctUntilChanged;
-import static awais.instagrabber.utils.Utils.settingsHelper;
-
-public class SearchFragmentViewModel extends AppStateViewModel {
-    private static final String TAG = SearchFragmentViewModel.class.getSimpleName();
-    private static final String QUERY = "query";
-
-    private final MutableLiveData<String> query = new MutableLiveData<>();
-    private final MutableLiveData<Resource<List<SearchItem>>> topResults = new MutableLiveData<>();
-    private final MutableLiveData<Resource<List<SearchItem>>> userResults = new MutableLiveData<>();
-    private final MutableLiveData<Resource<List<SearchItem>>> hashtagResults = new MutableLiveData<>();
-    private final MutableLiveData<Resource<List<SearchItem>>> locationResults = new MutableLiveData<>();
-
-    private final SearchService searchService;
-    private final Debouncer<String> searchDebouncer;
-    private final boolean isLoggedIn;
-    private final LiveData<String> distinctQuery;
-    private final RecentSearchRepository recentSearchRepository;
-    private final FavoriteRepository favoriteRepository;
-
-    private String tempQuery;
-
-    public SearchFragmentViewModel(@NonNull final Application application) {
-        super(application);
-        final String cookie = settingsHelper.getString(Constants.COOKIE);
-        isLoggedIn = !TextUtils.isEmpty(cookie) && CookieUtils.getUserIdFromCookie(cookie) != 0;
-        final Debouncer.Callback<String> searchCallback = new Debouncer.Callback<String>() {
-            @Override
-            public void call(final String key) {
-                if (tempQuery == null) return;
-                query.postValue(tempQuery);
-            }
-
-            @Override
-            public void onError(final Throwable t) {
-                Log.e(TAG, "onError: ", t);
-            }
-        };
-        searchDebouncer = new Debouncer<>(searchCallback, 500);
-        distinctQuery = distinctUntilChanged(query);
-        searchService = SearchService.getInstance();
-        recentSearchRepository = RecentSearchRepository.getInstance(RecentSearchDataSource.getInstance(application));
-        favoriteRepository = FavoriteRepository.Companion.getInstance(application);
+        override fun onError(t: Throwable) {
+            Log.e(TAG, "onError: ", t)
+        }
+    }
+    private val searchDebouncer = Debouncer(searchCallback, 500)
+    private val cookie = Utils.settingsHelper.getString(Constants.COOKIE)
+    private val isLoggedIn = !isEmpty(cookie) && getUserIdFromCookie(cookie) != 0L
+    private val distinctQuery = Transformations.distinctUntilChanged(query)
+    private val recentSearchRepository: RecentSearchRepository by lazy {
+        RecentSearchRepository.getInstance(RecentSearchDataSource.getInstance(application))
+    }
+    private val favoriteRepository: FavoriteRepository by lazy { FavoriteRepository.getInstance(application) }
+    private var tempQuery: String? = null
+    fun getQuery(): LiveData<String> {
+        return distinctQuery
     }
 
-    public LiveData<String> getQuery() {
-        return distinctQuery;
+    fun getTopResults(): LiveData<Resource<List<SearchItem>?>> {
+        return topResults
     }
 
-    public LiveData<Resource<List<SearchItem>>> getTopResults() {
-        return topResults;
+    fun getUserResults(): LiveData<Resource<List<SearchItem>?>> {
+        return userResults
     }
 
-    public LiveData<Resource<List<SearchItem>>> getUserResults() {
-        return userResults;
+    fun getHashtagResults(): LiveData<Resource<List<SearchItem>?>> {
+        return hashtagResults
     }
 
-    public LiveData<Resource<List<SearchItem>>> getHashtagResults() {
-        return hashtagResults;
+    fun getLocationResults(): LiveData<Resource<List<SearchItem>?>> {
+        return locationResults
     }
 
-    public LiveData<Resource<List<SearchItem>>> getLocationResults() {
-        return locationResults;
-    }
-
-    public void submitQuery(@Nullable final String query) {
-        String localQuery = query;
+    fun submitQuery(query: String?) {
+        var localQuery = query
         if (query == null) {
-            localQuery = "";
+            localQuery = ""
         }
-        if (tempQuery != null && Objects.equals(localQuery.toLowerCase(), tempQuery.toLowerCase())) return;
-        tempQuery = query;
-        if (TextUtils.isEmpty(query)) {
+        if (tempQuery != null && localQuery!!.lowercase(Locale.getDefault()) == tempQuery!!.lowercase(Locale.getDefault())) return
+        tempQuery = query
+        if (isEmpty(query)) {
             // If empty immediately post it
-            searchDebouncer.cancel(QUERY);
-            this.query.postValue("");
-            return;
+            searchDebouncer.cancel(QUERY)
+            this.query.postValue("")
+            return
         }
-        searchDebouncer.call(QUERY);
+        searchDebouncer.call(QUERY)
     }
 
-    public void search(@NonNull final String query,
-                       @NonNull final FavoriteType type) {
-        final MutableLiveData<Resource<List<SearchItem>>> liveData = getLiveDataByType(type);
-        if (liveData == null) return;
-        if (TextUtils.isEmpty(query)) {
-            showRecentSearchesAndFavorites(type, liveData);
-            return;
+    fun search(
+        query: String,
+        type: FavoriteType
+    ) {
+        val liveData = getLiveDataByType(type) ?: return
+        if (isEmpty(query)) {
+            showRecentSearchesAndFavorites(type, liveData)
+            return
         }
-        if (query.equals("@") || query.equals("#")) return;
-        final String c;
-        switch (type) {
-            case TOP:
-                c = "blended";
-                break;
-            case USER:
-                c = "user";
-                break;
-            case HASHTAG:
-                c = "hashtag";
-                break;
-            case LOCATION:
-                c = "place";
-                break;
-            default:
-                return;
+        if (query == "@" || query == "#") return
+        val c: String
+        c = when (type) {
+            FavoriteType.TOP -> "blended"
+            FavoriteType.USER -> "user"
+            FavoriteType.HASHTAG -> "hashtag"
+            FavoriteType.LOCATION -> "place"
+            else -> return
         }
-        liveData.postValue(Resource.loading(null));
-        final Call<SearchResponse> request = searchService.search(isLoggedIn, query, c);
-        request.enqueue(new Callback<SearchResponse>() {
-            @Override
-            public void onResponse(@NonNull final Call<SearchResponse> call,
-                                   @NonNull final Response<SearchResponse> response) {
-                if (!response.isSuccessful()) {
-                    sendErrorResponse(type);
-                    return;
-                }
-                final SearchResponse body = response.body();
-                if (body == null) {
-                    sendErrorResponse(type);
-                    return;
-                }
-                parseResponse(body, type);
+        liveData.postValue(loading<List<SearchItem>?>(null))
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val response = searchRepository.search(isLoggedIn, query, c)
+                parseResponse(response, type)
             }
-
-            @Override
-            public void onFailure(@NonNull final Call<SearchResponse> call,
-                                  @NonNull final Throwable t) {
-                Log.e(TAG, "onFailure: ", t);
+            catch (e: Exception) {
+                sendErrorResponse(type)
             }
-        });
+        }
     }
 
-    private void showRecentSearchesAndFavorites(@NonNull final FavoriteType type,
-                                                @NonNull final MutableLiveData<Resource<List<SearchItem>>> liveData) {
-        final SettableFuture<List<RecentSearch>> recentResultsFuture = SettableFuture.create();
-        final SettableFuture<List<Favorite>> favoritesFuture = SettableFuture.create();
-        recentSearchRepository.getAllRecentSearches(
-                CoroutineUtilsKt.getContinuation((recentSearches, throwable) -> AppExecutors.INSTANCE.getMainThread().execute(() -> {
-                    if (throwable != null) {
-                        Log.e(TAG, "showRecentSearchesAndFavorites: ", throwable);
-                        recentResultsFuture.set(Collections.emptyList());
-                        return;
-                    }
-                    if (type != FavoriteType.TOP) {
-                        recentResultsFuture.set((List<RecentSearch>) recentSearches
-                                .stream()
-                                .filter(rs -> rs.getType() == type)
-                                .collect(Collectors.toList())
-                        );
-                        return;
-                    }
-                    //noinspection unchecked
-                    recentResultsFuture.set((List<RecentSearch>) recentSearches);
-                }), Dispatchers.getIO())
-        );
-        favoriteRepository.getAllFavorites(
-                CoroutineUtilsKt.getContinuation((favorites, throwable) -> AppExecutors.INSTANCE.getMainThread().execute(() -> {
-                    if (throwable != null) {
-                        favoritesFuture.set(Collections.emptyList());
-                        Log.e(TAG, "showRecentSearchesAndFavorites: ", throwable);
-                        return;
-                    }
-                    if (type != FavoriteType.TOP) {
-                        favoritesFuture.set((List<Favorite>) favorites
-                                .stream()
-                                .filter(f -> f.getType() == type)
-                                .collect(Collectors.toList())
-                        );
-                        return;
-                    }
-                    //noinspection unchecked
-                    favoritesFuture.set((List<Favorite>) favorites);
-                }), Dispatchers.getIO())
-        );
-        //noinspection UnstableApiUsage
-        final ListenableFuture<List<List<?>>> listenableFuture = Futures.allAsList(recentResultsFuture, favoritesFuture);
-        Futures.addCallback(listenableFuture, new FutureCallback<List<List<?>>>() {
-            @Override
-            public void onSuccess(@Nullable final List<List<?>> result) {
-                if (!TextUtils.isEmpty(tempQuery)) return; // Make sure user has not entered anything before updating results
+    private fun showRecentSearchesAndFavorites(
+        type: FavoriteType,
+        liveData: MutableLiveData<Resource<List<SearchItem>?>>
+    ) {
+        val recentResultsFuture = SettableFuture.create<List<RecentSearch>>()
+        val favoritesFuture = SettableFuture.create<List<Favorite>>()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val recentSearches = recentSearchRepository.getAllRecentSearches()
+                recentResultsFuture.set(
+                    if (type == FavoriteType.TOP) recentSearches
+                    else recentSearches.stream()
+                        .filter { (_, _, _, _, _, type1) -> type1 === type }
+                        .collect(Collectors.toList())
+                )
+            }
+            catch (e: Exception) {
+                recentResultsFuture.set(emptyList())
+            }
+            try {
+                val favorites = favoriteRepository.getAllFavorites()
+                favoritesFuture.set(
+                    if (type == FavoriteType.TOP) favorites
+                    else favorites
+                        .stream()
+                        .filter { (_, _, type1) -> type1 === type }
+                        .collect(Collectors.toList())
+                )
+            }
+            catch (e: Exception) {
+                favoritesFuture.set(emptyList())
+            }
+        }
+        val listenableFuture = Futures.allAsList<List<*>>(recentResultsFuture, favoritesFuture)
+        Futures.addCallback(listenableFuture, object : FutureCallback<List<List<*>?>?> {
+            override fun onSuccess(result: List<List<*>?>?) {
+                if (!isEmpty(tempQuery)) return  // Make sure user has not entered anything before updating results
                 if (result == null) {
-                    liveData.postValue(Resource.success(Collections.emptyList()));
-                    return;
+                    liveData.postValue(success(emptyList()))
+                    return
                 }
                 try {
-                    //noinspection unchecked
-                    liveData.postValue(Resource.success(
-                            ImmutableList.<SearchItem>builder()
-                                    .addAll(SearchItem.fromRecentSearch((List<RecentSearch>) result.get(0)))
-                                    .addAll(SearchItem.fromFavorite((List<Favorite>) result.get(1)))
-                                    .build()
-                    ));
-                } catch (Exception e) {
-                    Log.e(TAG, "onSuccess: ", e);
-                    liveData.postValue(Resource.success(Collections.emptyList()));
+                    liveData.postValue(
+                        success(
+                            ImmutableList.builder<SearchItem>()
+                                .addAll(SearchItem.fromRecentSearch(result[0] as List<RecentSearch?>?))
+                                .addAll(SearchItem.fromFavorite(result[1] as List<Favorite?>?))
+                                .build()
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "onSuccess: ", e)
+                    liveData.postValue(success(emptyList()))
                 }
             }
 
-            @Override
-            public void onFailure(@NonNull final Throwable t) {
-                if (!TextUtils.isEmpty(tempQuery)) return;
-                liveData.postValue(Resource.success(Collections.emptyList()));
-                Log.e(TAG, "onFailure: ", t);
+            override fun onFailure(t: Throwable) {
+                if (!isEmpty(tempQuery)) return
+                liveData.postValue(success(emptyList()))
+                Log.e(TAG, "onFailure: ", t)
             }
-        }, AppExecutors.INSTANCE.getMainThread());
+        }, mainThread)
     }
 
-    private void sendErrorResponse(@NonNull final FavoriteType type) {
-        final MutableLiveData<Resource<List<SearchItem>>> liveData = getLiveDataByType(type);
-        if (liveData == null) return;
-        liveData.postValue(Resource.error(null, Collections.emptyList()));
+    private fun sendErrorResponse(type: FavoriteType) {
+        val liveData = getLiveDataByType(type) ?: return
+        liveData.postValue(error(null, emptyList()))
     }
 
-    private MutableLiveData<Resource<List<SearchItem>>> getLiveDataByType(@NonNull final FavoriteType type) {
-        final MutableLiveData<Resource<List<SearchItem>>> liveData;
-        switch (type) {
-            case TOP:
-                liveData = topResults;
-                break;
-            case USER:
-                liveData = userResults;
-                break;
-            case HASHTAG:
-                liveData = hashtagResults;
-                break;
-            case LOCATION:
-                liveData = locationResults;
-                break;
-            default:
-                return null;
+    private fun getLiveDataByType(type: FavoriteType): MutableLiveData<Resource<List<SearchItem>?>>? {
+        val liveData: MutableLiveData<Resource<List<SearchItem>?>>
+        liveData = when (type) {
+            FavoriteType.TOP -> topResults
+            FavoriteType.USER -> userResults
+            FavoriteType.HASHTAG -> hashtagResults
+            FavoriteType.LOCATION -> locationResults
+            else -> return null
         }
-        return liveData;
+        return liveData
     }
 
-    private void parseResponse(@NonNull final SearchResponse body,
-                               @NonNull final FavoriteType type) {
-        final MutableLiveData<Resource<List<SearchItem>>> liveData = getLiveDataByType(type);
-        if (liveData == null) return;
+    private fun parseResponse(
+        body: SearchResponse,
+        type: FavoriteType
+    ) {
+        val liveData = getLiveDataByType(type) ?: return
         if (isLoggedIn) {
-            if (body.getList() == null) {
-                liveData.postValue(Resource.success(Collections.emptyList()));
-                return;
+            if (body.list == null) {
+                liveData.postValue(success(emptyList()))
+                return
             }
-            if (type == FavoriteType.HASHTAG || type == FavoriteType.LOCATION) {
-                liveData.postValue(Resource.success(body.getList()
-                                                        .stream()
-                                                        .filter(i -> i.getUser() == null)
-                                                        .collect(Collectors.toList())));
-                return;
+            if (type === FavoriteType.HASHTAG || type === FavoriteType.LOCATION) {
+                liveData.postValue(success(body.list
+                    .stream()
+                    .filter { i: SearchItem -> i.user == null }
+                    .collect(Collectors.toList())))
+                return
             }
-            liveData.postValue(Resource.success(body.getList()));
-            return;
+            liveData.postValue(success(body.list))
+            return
         }
 
         // anonymous
-        final List<SearchItem> list;
-        switch (type) {
-            case TOP:
-                list = ImmutableList
-                        .<SearchItem>builder()
-                        .addAll(body.getUsers() == null ? Collections.emptyList() : body.getUsers())
-                        .addAll(body.getHashtags() == null ? Collections.emptyList() : body.getHashtags())
-                        .addAll(body.getPlaces() == null ? Collections.emptyList() : body.getPlaces())
-                        .build();
-                break;
-            case USER:
-                list = body.getUsers();
-                break;
-            case HASHTAG:
-                list = body.getHashtags();
-                break;
-            case LOCATION:
-                list = body.getPlaces();
-                break;
-            default:
-                return;
+        val list: List<SearchItem>?
+        list = when (type) {
+            FavoriteType.TOP -> ImmutableList
+                .builder<SearchItem>()
+                .addAll(body.users ?: emptyList())
+                .addAll(body.hashtags ?: emptyList())
+                .addAll(body.places ?: emptyList())
+                .build()
+            FavoriteType.USER -> body.users
+            FavoriteType.HASHTAG -> body.hashtags
+            FavoriteType.LOCATION -> body.places
+            else -> return
         }
-        liveData.postValue(Resource.success(list));
+        liveData.postValue(success(list))
     }
 
-    public void saveToRecentSearches(final SearchItem searchItem) {
-        if (searchItem == null) return;
-        try {
-            final RecentSearch recentSearch = RecentSearch.fromSearchItem(searchItem);
-            if (recentSearch == null) return;
-            recentSearchRepository.insertOrUpdateRecentSearch(
-                    recentSearch,
-                    CoroutineUtilsKt.getContinuation((unit, throwable) -> AppExecutors.INSTANCE.getMainThread().execute(() -> {
-                        if (throwable != null) {
-                            Log.e(TAG, "saveToRecentSearches: ", throwable);
-                            // return;
-                        }
-                        // Log.d(TAG, "onSuccess: inserted recent: " + recentSearch);
-                    }), Dispatchers.getIO())
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "saveToRecentSearches: ", e);
+    fun saveToRecentSearches(searchItem: SearchItem?) {
+        if (searchItem == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val recentSearch = fromSearchItem(searchItem)
+                recentSearchRepository.insertOrUpdateRecentSearch(recentSearch!!)
+            } catch (e: Exception) {
+                Log.e(TAG, "saveToRecentSearches: ", e)
+            }
         }
     }
 
-    @Nullable
-    public LiveData<Resource<Object>> deleteRecentSearch(final SearchItem searchItem) {
-        if (searchItem == null || !searchItem.isRecent()) return null;
-        final RecentSearch recentSearch = RecentSearch.fromSearchItem(searchItem);
-        if (recentSearch == null) return null;
-        final MutableLiveData<Resource<Object>> data = new MutableLiveData<>();
-        data.postValue(Resource.loading(null));
-        recentSearchRepository.deleteRecentSearchByIgIdAndType(
-                recentSearch.getIgId(),
-                recentSearch.getType(),
-                CoroutineUtilsKt.getContinuation((unit, throwable) -> AppExecutors.INSTANCE.getMainThread().execute(() -> {
-                    if (throwable != null) {
-                        Log.e(TAG, "deleteRecentSearch: ", throwable);
-                        data.postValue(Resource.error("Error deleting recent item", null));
-                        return;
-                    }
-                    data.postValue(Resource.success(new Object()));
-                }), Dispatchers.getIO())
-        );
-        return data;
+    fun deleteRecentSearch(searchItem: SearchItem?): LiveData<Resource<Any?>>? {
+        if (searchItem == null || !searchItem.isRecent) return null
+        val (_, igId, _, _, _, type) = fromSearchItem(searchItem) ?: return null
+        val data = MutableLiveData<Resource<Any?>>()
+        data.postValue(loading(null))
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                recentSearchRepository.deleteRecentSearchByIgIdAndType(igId, type)
+                data.postValue(success(Any()))
+            }
+            catch (e: Exception) {
+                data.postValue(error(e.message, null))
+            }
+        }
+        return data
+    }
+
+    companion object {
+        private val TAG = SearchFragmentViewModel::class.java.simpleName
+        private const val QUERY = "query"
     }
 }
