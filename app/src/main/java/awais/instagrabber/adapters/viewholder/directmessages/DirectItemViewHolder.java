@@ -128,7 +128,7 @@ public abstract class DirectItemViewHolder extends RecyclerView.ViewHolder imple
 
     private void bindBase(@NonNull final DirectItem item, final MessageDirection messageDirection, final int position) {
         final FrameLayout.LayoutParams containerLayoutParams = (FrameLayout.LayoutParams) binding.container.getLayoutParams();
-        final DirectItemType itemType = item.getItemType();
+        final DirectItemType itemType = item.getItemType() == null ? DirectItemType.UNKNOWN : item.getItemType();
         setMessageDirectionGravity(messageDirection, containerLayoutParams);
         setGroupUserDetails(item, messageDirection);
         setBackground(messageDirection);
