@@ -47,7 +47,7 @@ class SearchFragmentViewModel(application: Application) : AppStateViewModel(appl
     private val searchCallback: Debouncer.Callback<String> = object : Debouncer.Callback<String> {
         override fun call(key: String) {
             if (tempQuery == null) return
-            query.postValue(tempQuery)
+            query.postValue(tempQuery!!)
         }
 
         override fun onError(t: Throwable) {
