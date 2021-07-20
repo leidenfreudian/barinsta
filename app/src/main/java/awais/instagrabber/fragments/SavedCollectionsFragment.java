@@ -34,9 +34,10 @@ import awais.instagrabber.databinding.FragmentSavedCollectionsBinding;
 import awais.instagrabber.repositories.responses.saved.CollectionsListResponse;
 import awais.instagrabber.utils.Constants;
 import awais.instagrabber.utils.CookieUtils;
+import awais.instagrabber.utils.CoroutineUtilsKt;
 import awais.instagrabber.utils.Utils;
 import awais.instagrabber.viewmodels.SavedCollectionsViewModel;
-import awais.instagrabber.webservices.ProfileService;
+import awais.instagrabber.webservices.ProfileRepository;
 import awais.instagrabber.webservices.ServiceCallback;
 
 import static awais.instagrabber.utils.Utils.settingsHelper;
@@ -51,14 +52,14 @@ public class SavedCollectionsFragment extends Fragment implements SwipeRefreshLa
     private SavedCollectionsViewModel savedCollectionsViewModel;
     private boolean shouldRefresh = true;
     private boolean isSaving;
-    private ProfileService profileService;
+    private ProfileRepository profileRepository;
     private SavedCollectionsAdapter adapter;
 
     @Override
     public void onCreate(@Nullable final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fragmentActivity = (MainActivity) requireActivity();
-        profileService = ProfileService.getInstance();
+        profileRepository = ProfileRepository.Companion.getInstance();
         savedCollectionsViewModel = new ViewModelProvider(fragmentActivity).get(SavedCollectionsViewModel.class);
         setHasOptionsMenu(true);
     }
@@ -106,23 +107,20 @@ public class SavedCollectionsFragment extends Fragment implements SwipeRefreshLa
                     .setView(input)
                     .setPositiveButton(R.string.confirm, (d, w) -> {
                         final String cookie = settingsHelper.getString(Constants.COOKIE);
-                        profileService.createCollection(
+                        profileRepository.createCollection(
                                 input.getText().toString(),
                                 settingsHelper.getString(Constants.DEVICE_UUID),
                                 CookieUtils.getUserIdFromCookie(cookie),
                                 CookieUtils.getCsrfTokenFromCookie(cookie),
-                                new ServiceCallback<String>() {
-                                    @Override
-                                    public void onSuccess(final String result) {
-                                        onRefresh();
-                                    }
-
-                                    @Override
-                                    public void onFailure(final Throwable t) {
+                                CoroutineUtilsKt.getContinuation((result, t) -> {
+                                    if (t != null) {
                                         Log.e(TAG, "Error creating collection", t);
                                         Toast.makeText(context, t.getMessage(), Toast.LENGTH_SHORT).show();
+                                        return;
                                     }
-                                });
+                                    onRefresh();
+                                })
+                        );
                     })
                     .setNegativeButton(R.string.cancel, null)
                     .show();
@@ -174,20 +172,16 @@ public class SavedCollectionsFragment extends Fragment implements SwipeRefreshLa
 
     private void fetchTopics(final String maxId) {
         binding.swipeRefreshLayout.setRefreshing(true);
-        profileService.fetchCollections(maxId, new ServiceCallback<CollectionsListResponse>() {
-            @Override
-            public void onSuccess(final CollectionsListResponse result) {
-                if (result == null) return;
-                savedCollectionsViewModel.getList().postValue(result.getItems());
-                binding.swipeRefreshLayout.setRefreshing(false);
-            }
-
-            @Override
-            public void onFailure(final Throwable t) {
+        profileRepository.fetchCollections(maxId, CoroutineUtilsKt.getContinuation((result, t) -> {
+            if (t != null) {
                 Log.e(TAG, "onFailure", t);
                 binding.swipeRefreshLayout.setRefreshing(false);
+                return;
             }
-        });
+            if (result == null) return;
+            savedCollectionsViewModel.getList().postValue(result.getItems());
+            binding.swipeRefreshLayout.setRefreshing(false);
+        }));
     }
 
     private void setNavControllerResult(@NonNull final NavController navController, final String result) {

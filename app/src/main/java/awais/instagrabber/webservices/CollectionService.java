@@ -18,7 +18,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class CollectionService {
-    private static final String TAG = "ProfileService";
+    private static final String TAG = "CollectionService";
 
     private final CollectionRepository repository;
     private final String deviceUuid, csrfToken;
