@@ -70,11 +70,11 @@ public class CommentService {
     }
 
     public void fetchComments(@NonNull final String mediaId,
-                              final String maxId,
+                              final String minId,
                               @NonNull final ServiceCallback<CommentsFetchResponse> callback) {
         final Map<String, String> form = new HashMap<>();
         form.put("can_support_threading", "true");
-        if (maxId != null) form.put("max_id", maxId);
+        if (minId != null) form.put("min_id", minId);
         final Call<CommentsFetchResponse> request = repository.fetchComments(mediaId, form);
         request.enqueue(new Callback<CommentsFetchResponse>() {
             @Override

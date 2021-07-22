@@ -32,6 +32,7 @@ import awais.instagrabber.utils.Constants;
 import awais.instagrabber.utils.CookieUtils;
 import awais.instagrabber.utils.CoroutineUtilsKt;
 import awais.instagrabber.utils.Utils;
+import awais.instagrabber.utils.TextUtils;
 import awais.instagrabber.webservices.CommentService;
 import awais.instagrabber.webservices.GraphQLRepository;
 import awais.instagrabber.webservices.ServiceCallback;
@@ -77,7 +78,7 @@ public class CommentsViewerViewModel extends ViewModel {
                 comments = mergeList(rootList, comments);
             }
             rootCursor = result.getNextMinId();
-            rootHasNext = result.getHasMoreComments();
+            rootHasNext = !TextUtils.isEmpty(rootCursor);
             rootList.postValue(Resource.success(comments));
         }
 
@@ -233,7 +234,7 @@ public class CommentsViewerViewModel extends ViewModel {
                     final Comment commentModel = getComment(commentsJsonArray.getJSONObject(i).getJSONObject("node"), root);
                     builder.add(commentModel);
                 }
-                final Object result = root ? new CommentsFetchResponse(count, endCursor, builder.build(), hasNextPage)
+                final Object result = root ? new CommentsFetchResponse(count, endCursor, builder.build())
                                            : new ChildCommentsFetchResponse(count, endCursor, builder.build(), hasNextPage);
                 //noinspection unchecked
                 callback.onSuccess(result);
