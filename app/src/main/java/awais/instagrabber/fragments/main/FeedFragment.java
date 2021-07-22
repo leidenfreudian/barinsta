@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import awais.instagrabber.R;
 import awais.instagrabber.activities.MainActivity;
@@ -39,6 +40,7 @@ import awais.instagrabber.asyncs.FeedPostFetchService;
 import awais.instagrabber.customviews.PrimaryActionModeCallback;
 import awais.instagrabber.databinding.FragmentFeedBinding;
 import awais.instagrabber.dialogs.PostsLayoutPreferencesDialogFragment;
+import awais.instagrabber.fragments.settings.PreferenceKeys;
 import awais.instagrabber.models.PostsLayoutPreferences;
 import awais.instagrabber.repositories.requests.StoryViewerOptions;
 import awais.instagrabber.repositories.responses.Location;
@@ -405,6 +407,12 @@ public class FeedFragment extends Fragment implements SwipeRefreshLayout.OnRefre
                     }
                     storiesFetching = false;
                     //noinspection unchecked
+                    if (Utils.settingsHelper.getBoolean(PreferenceKeys.HIDE_MUTED_REELS)) {
+                        feedStoriesViewModel.getList().postValue(feedStoryModels
+                                .stream()
+                                .filter(s -> s.getMuted() != true)
+                                .collect(Collectors.toList()));
+                    }
                     feedStoriesViewModel.getList().postValue((List<Story>) feedStoryModels);
                     if (storyListMenu != null) storyListMenu.setVisible(true);
                     updateSwipeRefreshState();
