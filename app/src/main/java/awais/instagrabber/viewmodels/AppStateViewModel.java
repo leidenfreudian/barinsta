@@ -58,7 +58,7 @@ public class AppStateViewModel extends AndroidViewModel {
     public void fetchProfileDetails() {
         currentUser.postValue(Resource.loading(null));
         final long uid = CookieUtils.getUserIdFromCookie(cookie);
-        if (userRepository == null) {
+        if (uid == 0L) {
             currentUser.postValue(Resource.success(null));
             return;
         }

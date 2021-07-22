@@ -79,9 +79,7 @@ public class CommentService {
         request.enqueue(new Callback<CommentsFetchResponse>() {
             @Override
             public void onResponse(@NonNull final Call<CommentsFetchResponse> call, @NonNull final Response<CommentsFetchResponse> response) {
-                final CommentsFetchResponse cfr = response.body();
-                if (cfr == null) callback.onFailure(new Exception("response is empty"));
-                callback.onSuccess(cfr);
+                callback.onSuccess(response.body());
             }
 
             @Override

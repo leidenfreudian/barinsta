@@ -106,8 +106,21 @@ public final class CommentsViewerFragment extends BottomSheetDialogFragment {
         binding.swipeRefreshLayout.setNestedScrollingEnabled(false);
         root = binding.getRoot();
         appStateViewModel.getCurrentUserLiveData().observe(getViewLifecycleOwner(), userResource -> {
-            if (userResource == null || userResource.data == null) return;
+            if (userResource == null || userResource.status == Resource.Status.LOADING) return;
             viewModel.setCurrentUser(userResource.data);
+            if (userResource.data == null) {
+                viewModel.fetchComments();
+                return;
+            }
+            viewModel.getCurrentUserId().observe(getViewLifecycleOwner(), new Observer<Long>() {
+                @Override
+                public void onChanged(final Long i) {
+                    if (i != 0L) {
+                        viewModel.fetchComments();
+                        viewModel.getCurrentUserId().removeObserver(this);
+                    }
+                }
+            });
         });
         if (getArguments() == null) return root;
         final CommentsViewerFragmentArgs args = CommentsViewerFragmentArgs.fromBundle(getArguments());

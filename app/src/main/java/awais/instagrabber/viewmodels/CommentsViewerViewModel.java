@@ -43,7 +43,6 @@ import static awais.instagrabber.utils.Utils.settingsHelper;
 public class CommentsViewerViewModel extends ViewModel {
     private static final String TAG = CommentsViewerViewModel.class.getSimpleName();
 
-    private final MutableLiveData<Boolean> isLoggedIn = new MutableLiveData<>(false);
     private final MutableLiveData<Long> currentUserId = new MutableLiveData<>(0L);
     private final MutableLiveData<Resource<List<Comment>>> rootList = new MutableLiveData<>();
     private final MutableLiveData<Integer> rootCount = new MutableLiveData<>(0);
@@ -130,18 +129,12 @@ public class CommentsViewerViewModel extends ViewModel {
     }
 
     public void setCurrentUser(final User currentUser) {
-        isLoggedIn.postValue(currentUser != null);
         currentUserId.postValue(currentUser == null ? 0 : currentUser.getPk());
     }
 
     public void setPostDetails(final String shortCode, final String postId, final long postUserId) {
         this.shortCode = shortCode;
         this.postId = postId;
-        fetchComments();
-    }
-
-    public LiveData<Boolean> isLoggedIn() {
-        return isLoggedIn;
     }
 
     public LiveData<Long> getCurrentUserId() {
@@ -174,7 +167,7 @@ public class CommentsViewerViewModel extends ViewModel {
         if (shortCode == null || postId == null) return;
         if (!rootHasNext) return;
         rootList.postValue(Resource.loading(getPrevList(rootList)));
-        if (isLoggedIn.getValue()) {
+        if (currentUserId.getValue() != 0L) {
             commentService.fetchComments(postId, rootCursor, ccb);
             return;
         }
@@ -202,8 +195,7 @@ public class CommentsViewerViewModel extends ViewModel {
             list = getPrevList(replyList);
         }
         replyList.postValue(Resource.loading(list));
-        final Boolean isLoggedInValue = isLoggedIn.getValue();
-        if (isLoggedInValue != null && isLoggedInValue) {
+        if (currentUserId.getValue() != 0L) {
             commentService.fetchChildComments(postId, commentId, repliesCursor, rcb);
             return;
         }
