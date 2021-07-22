@@ -54,7 +54,7 @@ public abstract class FeedItemViewHolder extends RecyclerView.ViewHolder {
         setupActions(media);
         if (media.getType() != MediaItemType.MEDIA_TYPE_SLIDER) {
             bottomBinding.download.setOnClickListener(v ->
-                    feedItemCallback.onDownloadClick(media, -1, null)
+                    feedItemCallback.onDownloadClick(media, -1, bottomBinding.download)
             );
         }
         bindItem(media);
