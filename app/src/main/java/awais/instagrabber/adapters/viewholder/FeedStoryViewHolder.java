@@ -38,7 +38,7 @@ public final class FeedStoryViewHolder extends RecyclerView.ViewHolder {
         binding.icon.setAlpha(isFullyRead ? 0.5F : 1.0F);
 
         if (model.getBroadcast() != null) binding.icon.setStoriesBorder(2);
-        else if (model.getHasBestiesMedia()) binding.icon.setStoriesBorder(1);
+        else if (model.getHasBestiesMedia() == true) binding.icon.setStoriesBorder(1);
         else binding.icon.setStoriesBorder(0);
     }
 }
