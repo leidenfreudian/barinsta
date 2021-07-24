@@ -6,6 +6,7 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -113,10 +114,14 @@ class FollowViewerFragment : Fragment(), SwipeRefreshLayout.OnRefreshListener {
             binding.swipeRefreshLayout.isRefreshing = true
             val liveData = if (searching) viewModel.search(isFollowersList)
             else viewModel.fetch(isFollowersList, null)
-            liveData.observe(viewLifecycleOwner) {
-                binding.swipeRefreshLayout.isRefreshing = it.status != Resource.Status.SUCCESS
-                layoutManager.scrollToPosition(totalItemsCount)
+            val listOb = object : Observer<Resource<Any?>> {
+                override fun onChanged(it: Resource<Any?>) {
+                    binding.swipeRefreshLayout.isRefreshing = it.status != Resource.Status.SUCCESS
+                    layoutManager.scrollToPosition(totalItemsCount)
+                    liveData.removeObserver(this)
+                }
             }
+            liveData.observe(viewLifecycleOwner, listOb)
         }
         binding.rvFollow.addOnScrollListener(lazyLoader)
         binding.rvFollow.layoutManager = layoutManager
@@ -153,25 +158,28 @@ class FollowViewerFragment : Fragment(), SwipeRefreshLayout.OnRefreshListener {
             override fun onQueryTextChange(query: String): Boolean {
                 if (query.isEmpty()) {
                     if (!isCompare && searching) {
-                        searching = false
                         viewModel.setQuery(null, isFollowersList)
                         viewModel.getSearch().removeObservers(viewLifecycleOwner)
                         viewModel.getList(isFollowersList).observe(viewLifecycleOwner) {
                             refreshAdapter(it, null, null, null)
                         }
+                        searching = false
                         return true
                     }
-                    if (isCompare && searching) {
+                    if (searching) {
                         adapter!!.filter.filter("")
-                        return true
+                        searching = false
                     }
+                    return true
                 }
-                searching = true
+                if (!searching) {
+                    viewModel.getList(isFollowersList).removeObservers(viewLifecycleOwner)
+                    searching = true
+                }
                 if (isCompare && adapter != null) {
                     adapter!!.filter.filter(query)
                     return true
                 }
-                viewModel.getList(isFollowersList).removeObservers(viewLifecycleOwner)
                 binding.swipeRefreshLayout.isRefreshing = true
                 viewModel.setQuery(query, isFollowersList)
                 viewModel.getSearch().observe(viewLifecycleOwner) {
