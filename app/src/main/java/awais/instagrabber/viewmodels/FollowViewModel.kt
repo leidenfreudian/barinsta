@@ -45,21 +45,15 @@ class FollowViewModel : ViewModel() {
                     if (it.first && it.second) {
                         val followersList = followers.value!!
                         val followingList = followings.value!!
-                        val allUsers: MutableList<User> = mutableListOf()
-                        allUsers.addAll(followersList)
-                        allUsers.addAll(followingList)
-                        val followersMap = followersList.groupBy { it.pk }
                         val followingMap = followingList.groupBy { it.pk }
                         val mutual: MutableList<User> = mutableListOf()
-                        val onlyFollowing: MutableList<User> = mutableListOf()
                         val onlyFollowers: MutableList<User> = mutableListOf()
-                        allUsers.forEach {
-                            val isFollowing = followingMap.get(it.pk) != null
-                            val isFollower = followersMap.get(it.pk) != null
-                            if (isFollowing && isFollower) mutual.add(it)
-                            else if (isFollowing) onlyFollowing.add(it)
-                            else if (isFollower) onlyFollowers.add(it)
+                        followersList.forEach {
+                            if (followingMap.get(it.pk) != null) mutual.add(it)
+                            else onlyFollowers.add(it)
                         }
+                        val mutualMap = mutual.groupBy { it.pk }
+                        val onlyFollowing = followingList.filter { mutualMap.get(it.pk) == null }
                         postValue(Triple(mutual, onlyFollowing, onlyFollowers))
                     }
                 }

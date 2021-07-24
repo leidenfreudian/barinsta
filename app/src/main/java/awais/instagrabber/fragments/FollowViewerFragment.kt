@@ -153,14 +153,18 @@ class FollowViewerFragment : Fragment(), SwipeRefreshLayout.OnRefreshListener {
             override fun onQueryTextChange(query: String): Boolean {
                 if (query.isEmpty()) {
                     if (!isCompare && searching) {
+                        searching = false
                         viewModel.setQuery(null, isFollowersList)
                         viewModel.getSearch().removeObservers(viewLifecycleOwner)
                         viewModel.getList(isFollowersList).observe(viewLifecycleOwner) {
                             refreshAdapter(it, null, null, null)
                         }
+                        return true
                     }
-                    searching = false
-                    return true
+                    if (isCompare && searching) {
+                        adapter!!.filter.filter("")
+                        return true
+                    }
                 }
                 searching = true
                 if (isCompare && adapter != null) {
