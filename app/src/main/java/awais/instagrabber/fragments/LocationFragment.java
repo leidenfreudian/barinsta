@@ -58,8 +58,8 @@ import awais.instagrabber.utils.DownloadUtils;
 import awais.instagrabber.utils.TextUtils;
 import awais.instagrabber.utils.Utils;
 import awais.instagrabber.webservices.GraphQLRepository;
-import awais.instagrabber.webservices.LocationService;
-import awais.instagrabber.webservices.ServiceCallback;
+import awais.instagrabber.webservices.LocationRepository;
+import kotlin.coroutines.Continuation;
 import kotlinx.coroutines.Dispatchers;
 
 import static awais.instagrabber.utils.Utils.settingsHelper;
@@ -76,7 +76,7 @@ public class LocationFragment extends Fragment implements SwipeRefreshLayout.OnR
     private Location locationModel;
     private ActionMode actionMode;
     private GraphQLRepository graphQLRepository;
-    private LocationService locationService;
+    private LocationRepository locationRepository;
     private boolean isLoggedIn;
     private Set<Media> selectedFeedModels;
     private PostsLayoutPreferences layoutPreferences = Utils.getPostsLayoutPreferences(Constants.PREF_LOCATION_POSTS_LAYOUT);
@@ -257,19 +257,6 @@ public class LocationFragment extends Fragment implements SwipeRefreshLayout.OnR
             }
         }
     };
-    private final ServiceCallback<Location> cb = new ServiceCallback<Location>() {
-        @Override
-        public void onSuccess(final Location result) {
-            locationModel = result;
-            binding.swipeRefreshLayout.setRefreshing(false);
-            setupLocationDetails();
-        }
-
-        @Override
-        public void onFailure(final Throwable t) {
-            setupLocationDetails();
-        }
-    };
 
     @Override
     public void onCreate(@Nullable final Bundle savedInstanceState) {
@@ -277,7 +264,7 @@ public class LocationFragment extends Fragment implements SwipeRefreshLayout.OnR
         fragmentActivity = (MainActivity) requireActivity();
         final String cookie = settingsHelper.getString(Constants.COOKIE);
         isLoggedIn = !TextUtils.isEmpty(cookie) && CookieUtils.getUserIdFromCookie(cookie) > 0;
-        locationService = isLoggedIn ? LocationService.getInstance() : null;
+        locationRepository = isLoggedIn ? LocationRepository.Companion.getInstance() : null;
         // storiesRepository = StoriesRepository.Companion.getInstance();
         graphQLRepository = isLoggedIn ? null : GraphQLRepository.Companion.getInstance();
         setHasOptionsMenu(true);
@@ -372,17 +359,15 @@ public class LocationFragment extends Fragment implements SwipeRefreshLayout.OnR
 
     private void fetchLocationModel() {
         binding.swipeRefreshLayout.setRefreshing(true);
-        if (isLoggedIn) locationService.fetch(locationId, cb);
-        else graphQLRepository.fetchLocation(
-                locationId,
-                CoroutineUtilsKt.getContinuation((location, throwable) -> AppExecutors.INSTANCE.getMainThread().execute(() -> {
-                    if (throwable != null) {
-                        cb.onFailure(throwable);
-                        return;
-                    }
-                    cb.onSuccess(location);
-                }))
-        );
+        final Continuation<Location> cb = CoroutineUtilsKt.getContinuation((result, t) -> {
+            locationModel = result;
+            AppExecutors.INSTANCE.getMainThread().execute(() -> {
+                setupLocationDetails();
+                binding.swipeRefreshLayout.setRefreshing(false);
+            });
+        }, Dispatchers.getIO());
+        if (isLoggedIn) locationRepository.fetch(locationId, cb);
+        else graphQLRepository.fetchLocation(locationId, cb);
     }
 
     private void setupLocationDetails() {

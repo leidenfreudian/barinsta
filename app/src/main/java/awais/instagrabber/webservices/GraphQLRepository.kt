@@ -262,7 +262,7 @@ open class GraphQLRepository(private val service: GraphQLService) {
             body.getString(Constants.EXTRAS_ID),
             body.getString("name"),
             timelineMedia.getLong("count"),
-            if (body.optBoolean("is_following")) FollowingType.FOLLOWING else FollowingType.NOT_FOLLOWING,
+            if (body.optBoolean("is_following")) 1 else 0,
             null
         )
     }

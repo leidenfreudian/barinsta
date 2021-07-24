@@ -9,12 +9,13 @@ import awais.instagrabber.repositories.responses.Media;
 import awais.instagrabber.repositories.responses.PostsFetchResponse;
 import awais.instagrabber.utils.CoroutineUtilsKt;
 import awais.instagrabber.webservices.GraphQLRepository;
-import awais.instagrabber.webservices.LocationService;
+import awais.instagrabber.webservices.LocationRepository;
 import awais.instagrabber.webservices.ServiceCallback;
+import kotlin.coroutines.Continuation;
 import kotlinx.coroutines.Dispatchers;
 
 public class LocationPostFetchService implements PostFetcher.PostFetchService {
-    private final LocationService locationService;
+    private final LocationRepository locationRepository;
     private final GraphQLRepository graphQLRepository;
     private final Location locationModel;
     private String nextMaxId;
@@ -24,42 +25,31 @@ public class LocationPostFetchService implements PostFetcher.PostFetchService {
     public LocationPostFetchService(final Location locationModel, final boolean isLoggedIn) {
         this.locationModel = locationModel;
         this.isLoggedIn = isLoggedIn;
-        locationService = isLoggedIn ? LocationService.getInstance() : null;
+        locationRepository = isLoggedIn ? LocationRepository.Companion.getInstance() : null;
         graphQLRepository = isLoggedIn ? null : GraphQLRepository.Companion.getInstance();
     }
 
     @Override
     public void fetch(final FetchListener<List<Media>> fetchListener) {
-        final ServiceCallback<PostsFetchResponse> cb = new ServiceCallback<PostsFetchResponse>() {
-            @Override
-            public void onSuccess(final PostsFetchResponse result) {
-                if (result == null) return;
-                nextMaxId = result.getNextCursor();
-                moreAvailable = result.getHasNextPage();
-                if (fetchListener != null) {
-                    fetchListener.onResult(result.getFeedModels());
-                }
-            }
-
-            @Override
-            public void onFailure(final Throwable t) {
-                // Log.e(TAG, "onFailure: ", t);
+        final Continuation<PostsFetchResponse> cb = CoroutineUtilsKt.getContinuation((result, t) -> {
+            if (t != null) {
                 if (fetchListener != null) {
                     fetchListener.onFailure(t);
                 }
+                return;
             }
-        };
-        if (isLoggedIn) locationService.fetchPosts(locationModel.getPk(), nextMaxId, cb);
+            if (result == null) return;
+            nextMaxId = result.getNextCursor();
+            moreAvailable = result.getHasNextPage();
+            if (fetchListener != null) {
+                fetchListener.onResult(result.getFeedModels());
+            }
+        }, Dispatchers.getIO());
+        if (isLoggedIn) locationRepository.fetchPosts(locationModel.getPk(), nextMaxId, cb);
         else graphQLRepository.fetchLocationPosts(
                 locationModel.getPk(),
                 nextMaxId,
-                CoroutineUtilsKt.getContinuation((postsFetchResponse, throwable) -> {
-                    if (throwable != null) {
-                        cb.onFailure(throwable);
-                        return;
-                    }
-                    cb.onSuccess(postsFetchResponse);
-                }, Dispatchers.getIO())
+                cb
         );
     }
 

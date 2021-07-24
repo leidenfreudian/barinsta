@@ -9,12 +9,13 @@ import awais.instagrabber.repositories.responses.Media;
 import awais.instagrabber.repositories.responses.PostsFetchResponse;
 import awais.instagrabber.utils.CoroutineUtilsKt;
 import awais.instagrabber.webservices.GraphQLRepository;
+import awais.instagrabber.webservices.HashtagRepository;
 import awais.instagrabber.webservices.ServiceCallback;
-import awais.instagrabber.webservices.TagsService;
+import kotlin.coroutines.Continuation;
 import kotlinx.coroutines.Dispatchers;
 
 public class HashtagPostFetchService implements PostFetcher.PostFetchService {
-    private final TagsService tagsService;
+    private final HashtagRepository hashtagRepository;
     private final GraphQLRepository graphQLRepository;
     private final Hashtag hashtagModel;
     private String nextMaxId;
@@ -24,42 +25,31 @@ public class HashtagPostFetchService implements PostFetcher.PostFetchService {
     public HashtagPostFetchService(final Hashtag hashtagModel, final boolean isLoggedIn) {
         this.hashtagModel = hashtagModel;
         this.isLoggedIn = isLoggedIn;
-        tagsService = isLoggedIn ? TagsService.getInstance() : null;
+        hashtagRepository = isLoggedIn ? HashtagRepository.Companion.getInstance() : null;
         graphQLRepository = isLoggedIn ? null : GraphQLRepository.Companion.getInstance();
     }
 
     @Override
     public void fetch(final FetchListener<List<Media>> fetchListener) {
-        final ServiceCallback<PostsFetchResponse> cb = new ServiceCallback<PostsFetchResponse>() {
-            @Override
-            public void onSuccess(final PostsFetchResponse result) {
-                if (result == null) return;
-                nextMaxId = result.getNextCursor();
-                moreAvailable = result.getHasNextPage();
-                if (fetchListener != null) {
-                    fetchListener.onResult(result.getFeedModels());
-                }
-            }
-
-            @Override
-            public void onFailure(final Throwable t) {
-                // Log.e(TAG, "onFailure: ", t);
+        final Continuation<PostsFetchResponse> cb = CoroutineUtilsKt.getContinuation((result, t) -> {
+            if (t != null) {
                 if (fetchListener != null) {
                     fetchListener.onFailure(t);
                 }
+                return;
             }
-        };
-        if (isLoggedIn) tagsService.fetchPosts(hashtagModel.getName().toLowerCase(), nextMaxId, cb);
+            if (result == null) return;
+            nextMaxId = result.getNextCursor();
+            moreAvailable = result.getHasNextPage();
+            if (fetchListener != null) {
+                fetchListener.onResult(result.getFeedModels());
+            }
+        }, Dispatchers.getIO());
+        if (isLoggedIn) hashtagRepository.fetchPosts(hashtagModel.getName().toLowerCase(), nextMaxId, cb);
         else graphQLRepository.fetchHashtagPosts(
                 hashtagModel.getName().toLowerCase(),
                 nextMaxId,
-                CoroutineUtilsKt.getContinuation((postsFetchResponse, throwable) -> {
-                    if (throwable != null) {
-                        cb.onFailure(throwable);
-                        return;
-                    }
-                    cb.onSuccess(postsFetchResponse);
-                }, Dispatchers.getIO())
+                cb
         );
     }
 
