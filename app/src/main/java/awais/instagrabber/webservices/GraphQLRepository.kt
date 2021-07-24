@@ -1,7 +1,6 @@
 package awais.instagrabber.webservices
 
 import android.util.Log
-import awais.instagrabber.models.enums.FollowingType
 import awais.instagrabber.repositories.GraphQLService
 import awais.instagrabber.repositories.responses.*
 import awais.instagrabber.utils.Constants
@@ -299,7 +298,7 @@ open class GraphQLRepository(private val service: GraphQLService) {
 
         fun getInstance(): GraphQLRepository {
             return INSTANCE ?: synchronized(this) {
-                val service: GraphQLService = RetrofitFactory.retrofitWeb.create(GraphQLService::class.java)
+                val service = RetrofitFactory.retrofitWeb.create(GraphQLService::class.java)
                 GraphQLRepository(service).also { INSTANCE = it }
             }
         }

@@ -10,7 +10,7 @@ import com.google.common.collect.ImmutableMap
 import java.util.*
 import java.util.stream.Collectors
 
-class ProfileRepository private constructor(private val repository: ProfileService) {
+open class ProfileRepository(private val repository: ProfileService) {
     suspend fun fetchPosts(
         userId: Long,
         maxId: String?
@@ -113,7 +113,7 @@ class ProfileRepository private constructor(private val repository: ProfileServi
 
         fun getInstance(): ProfileRepository {
             return INSTANCE ?: synchronized(this) {
-                val service: ProfileService = RetrofitFactory.retrofit.create(ProfileService::class.java)
+                val service = RetrofitFactory.retrofit.create(ProfileService::class.java)
                 ProfileRepository(service).also { INSTANCE = it }
             }
         }

@@ -6,7 +6,7 @@ import awais.instagrabber.webservices.RetrofitFactory.retrofitWeb
 import com.google.common.collect.ImmutableMap
 import retrofit2.Call
 
-class SearchRepository(private val service: SearchService) {
+open class SearchRepository(private val service: SearchService) {
     suspend fun search(
         isLoggedIn: Boolean,
         query: String,

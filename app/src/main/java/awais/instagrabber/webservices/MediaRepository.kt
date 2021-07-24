@@ -189,7 +189,7 @@ class MediaRepository(private val service: MediaService) {
 
         fun getInstance(): MediaRepository {
             return INSTANCE ?: synchronized(this) {
-                val service: MediaService = retrofit.create(MediaService::class.java)
+                val service = retrofit.create(MediaService::class.java)
                 MediaRepository(service).also { INSTANCE = it }
             }
         }
