@@ -694,8 +694,8 @@ class StoryViewerFragment : Fragment() {
             (if (correctAnswer == tallies.indexOf(it)) "*** " else "") +
             it.text + " (" + it.count + ")" }
         val builder = AlertDialog.Builder(context)
-        if (title != null) builder.setTitle(title)
-        if (viewerVote != null) builder.setMessage(R.string.story_quizzed)
+        if (viewerVote != null) builder.setTitle(R.string.story_quizzed)
+        else if (title != null) builder.setTitle(title)
         builder.setPositiveButton(if (viewerVote == null) R.string.cancel else R.string.ok, null)
         val adapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, choices.toTypedArray())
         builder.setAdapter(adapter, onClickListener)
