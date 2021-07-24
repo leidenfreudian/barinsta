@@ -268,10 +268,13 @@ public class PostViewV2Fragment extends Fragment implements EditTextDialogFragme
     @Override
     public void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        final Media media = viewModel.getMedia();
-        if (media.getType() == MediaItemType.MEDIA_TYPE_SLIDER) {
-            outState.putInt(ARG_SLIDER_POSITION, sliderPosition);
+        try {
+            final Media media = viewModel.getMedia();
+            if (media.getType() == MediaItemType.MEDIA_TYPE_SLIDER) {
+                outState.putInt(ARG_SLIDER_POSITION, sliderPosition);
+            }
         }
+        catch (Exception _) {}
     }
 
     @Override
