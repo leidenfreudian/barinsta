@@ -231,7 +231,7 @@ public class MultiOptionDialogFragment<T extends Serializable> extends DialogFra
         void onCancel(int requestCode);
     }
 
-    public static class Option<T extends Serializable> {
+    public static class Option<T extends Serializable> implements Serializable {
         private final String label;
         private final T value;
         private final boolean checked;
