@@ -10,52 +10,49 @@ import awais.instagrabber.interfaces.FetchListener;
 import awais.instagrabber.repositories.responses.Media;
 import awais.instagrabber.repositories.responses.discover.TopicalExploreFeedResponse;
 import awais.instagrabber.repositories.responses.WrappedMedia;
-import awais.instagrabber.webservices.DiscoverService;
+import awais.instagrabber.utils.CoroutineUtilsKt;
+import awais.instagrabber.webservices.FeedRepository;
 import awais.instagrabber.webservices.ServiceCallback;
 
 public class DiscoverPostFetchService implements PostFetcher.PostFetchService {
     private static final String TAG = "DiscoverPostFetchService";
-    private final DiscoverService discoverService;
+    private final FeedRepository feedRepository;
     private String maxId;
     private boolean moreAvailable = false;
 
     public DiscoverPostFetchService() {
-        discoverService = DiscoverService.getInstance();
+        feedRepository = FeedRepository.Companion.getInstance();
     }
 
     @Override
     public void fetch(final FetchListener<List<Media>> fetchListener) {
-        discoverService.topicalExplore(maxId, new ServiceCallback<TopicalExploreFeedResponse>() {
-            @Override
-            public void onSuccess(final TopicalExploreFeedResponse result) {
-                if (result == null) {
-                    onFailure(new RuntimeException("result is null"));
-                    return;
-                }
-                moreAvailable = result.getMoreAvailable();
-                maxId = result.getNextMaxId();
-                final List<WrappedMedia> items = result.getItems();
-                final List<Media> posts;
-                if (items == null) {
-                    posts = Collections.emptyList();
-                } else {
-                    posts = items.stream()
-                                 .map(WrappedMedia::getMedia)
-                                 .filter(Objects::nonNull)
-                                 .collect(Collectors.toList());
-                }
-                if (fetchListener != null) {
-                    fetchListener.onResult(posts);
-                }
-            }
-
-            @Override
-            public void onFailure(final Throwable t) {
+        feedRepository.topicalExplore(maxId, CoroutineUtilsKt.getContinuation((result, t) -> {
+            if (t != null) {
                 if (fetchListener != null) {
                     fetchListener.onFailure(t);
                 }
+                return;
             }
-        });
+            if (result == null) {
+                fetchListener.onFailure(new RuntimeException("result is null"));
+                return;
+            }
+            moreAvailable = result.getMoreAvailable();
+            maxId = result.getNextMaxId();
+            final List<WrappedMedia> items = result.getItems();
+            final List<Media> posts;
+            if (items == null) {
+                posts = Collections.emptyList();
+            } else {
+                posts = items.stream()
+                             .map(WrappedMedia::getMedia)
+                             .filter(Objects::nonNull)
+                             .collect(Collectors.toList());
+            }
+            if (fetchListener != null) {
+                fetchListener.onResult(posts);
+            }
+        }));
     }
 
     @Override
