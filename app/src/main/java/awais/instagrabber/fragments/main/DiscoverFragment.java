@@ -272,7 +272,7 @@ public class DiscoverFragment extends Fragment implements SwipeRefreshLayout.OnR
     private void setupPosts() {
         binding.posts.setViewModelStoreOwner(this)
                 .setLifeCycleOwner(this)
-                .setPostFetchService(new DiscoverPostFetchService(new DiscoverService.TopicalExploreRequest()))
+                .setPostFetchService(new DiscoverPostFetchService())
                 .setLayoutPreferences(layoutPreferences)
                 .addFetchStatusChangeListener(fetching -> updateSwipeRefreshState())
                 .setFeedItemCallback(feedItemCallback)

@@ -16,17 +16,16 @@ import awais.instagrabber.webservices.ServiceCallback;
 public class DiscoverPostFetchService implements PostFetcher.PostFetchService {
     private static final String TAG = "DiscoverPostFetchService";
     private final DiscoverService discoverService;
-    private final DiscoverService.TopicalExploreRequest topicalExploreRequest;
+    private String maxId;
     private boolean moreAvailable = false;
 
-    public DiscoverPostFetchService(final DiscoverService.TopicalExploreRequest topicalExploreRequest) {
-        this.topicalExploreRequest = topicalExploreRequest;
+    public DiscoverPostFetchService() {
         discoverService = DiscoverService.getInstance();
     }
 
     @Override
     public void fetch(final FetchListener<List<Media>> fetchListener) {
-        discoverService.topicalExplore(topicalExploreRequest, new ServiceCallback<TopicalExploreFeedResponse>() {
+        discoverService.topicalExplore(maxId, new ServiceCallback<TopicalExploreFeedResponse>() {
             @Override
             public void onSuccess(final TopicalExploreFeedResponse result) {
                 if (result == null) {
@@ -34,7 +33,7 @@ public class DiscoverPostFetchService implements PostFetcher.PostFetchService {
                     return;
                 }
                 moreAvailable = result.getMoreAvailable();
-                topicalExploreRequest.setMaxId(result.getNextMaxId());
+                maxId = result.getNextMaxId();
                 final List<WrappedMedia> items = result.getItems();
                 final List<Media> posts;
                 if (items == null) {
@@ -61,7 +60,7 @@ public class DiscoverPostFetchService implements PostFetcher.PostFetchService {
 
     @Override
     public void reset() {
-        topicalExploreRequest.setMaxId(null);
+        maxId = null;
     }
 
     @Override
