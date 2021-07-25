@@ -747,7 +747,7 @@ class StoryViewerFragment : Fragment() {
         }
         else {
             input.isEnabled = false
-            tv.text = getString(R.string.slider_answer, percentage.format(slider.viewerVote))
+            if (slider.viewerVote != null) tv.text = getString(R.string.slider_answer, percentage.format(slider.viewerVote))
         }
         sliderView.addView(input)
         sliderView.addView(tv)
