@@ -46,10 +46,10 @@ open class StoriesRepository(private val service: StoriesService) {
         if (response?.tray != null) {
             val length = response.tray.size
             for (i in 0 until length) {
-                if (response.tray.get(i).reel_type.equals("mas_reel")) {
+                if (response.tray.get(i).User == null) {
                     continue
                 }
-                result.add(response.tray)
+                result.add(response.tray.get(i))
             }
         }
         //result.addAll(response.tray)
