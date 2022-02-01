@@ -46,7 +46,7 @@ open class StoriesRepository(private val service: StoriesService) {
         if (response?.tray != null) {
             val length = response.tray.size
             for (i in 0 until length) {
-                if (response.tray.get(i).User == null) {
+                if (response.tray.get(i).user == null) {
                     continue
                 }
                 result.add(response.tray.get(i))
